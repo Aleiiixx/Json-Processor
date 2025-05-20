@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar/Sidebar";
-import JSONProcessor from "./components/JSONProcessor/JSONProcessor";
+import JSONProcessor from "./Apps/JSONProcessor/JSONProcessor";
 import styles from "./App.module.css";
 
 const App: React.FC = () => {
