@@ -60,7 +60,7 @@ const JSONProcessor = () => {
 
   const saveScript = async () => {
     if (!folderScript || !nameScript) return alert("Indique carpeta y nombre del script");
-    await fetch(`${WORKER_URL}?folder=${folderScript}&name=${nameScript}`, {
+    await fetch(`${WORKER_URL}script?folder=${folderScript}&name=${nameScript}`, {
       method: "POST",
       body: jsBodyCode,
     });
@@ -71,7 +71,7 @@ const JSONProcessor = () => {
   };
 
   const loadScript = async (f: string, n: string) => {
-    const res = await fetch(`${WORKER_URL}?folder=${f}&name=${n}`);
+    const res = await fetch(`${WORKER_URL}script?folder=${f}&name=${n}`);
     const code = await res.text();
     setJsBodyCode(code);
     setShowDialog(false);
