@@ -21,12 +21,19 @@ const JSONProcessor = () => {
   const [output, setOutput] = useState<string>("");
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  const [folder, setFolder] = useState("");
-  const [name, setName] = useState("");
+
+  const [folderScript, setFolderScript] = useState("");
+  const [nameScript, setNameScript] = useState("");
+
+  const [folderJson, setFolderJson] = useState("");
+  const [nameJson, setNameJson] = useState("");
+
   const [scriptsList, setScriptsList] = useState<Record<string, string[]>>({});
   const [showDialog, setShowDialog] = useState(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+
+  const [jsonList, setJsonList] = useState<Record<string, string[]>>({});
 
   const functionHeader = "const processData = (data) => {\n";
   const functionFooter = "\n}";
@@ -52,17 +59,16 @@ const JSONProcessor = () => {
   };
 
   const saveScript = async () => {
-    if (!folder || !name) return alert("Indique carpeta y nombre del script");
-    await fetch(`${WORKER_URL}?folder=${folder}&name=${name}`, {
+    if (!folderScript || !nameScript) return alert("Indique carpeta y nombre del script");
+    await fetch(`${WORKER_URL}?folder=${folderScript}&name=${nameScript}`, {
       method: "POST",
       body: jsBodyCode,
     });
     await fetchScriptList();
     toast.success("Script guardado con éxito");
-    setFolder("");
-    setName("");
+    setFolderScript("");
+    setNameScript("");
   };
-
 
   const loadScript = async (f: string, n: string) => {
     const res = await fetch(`${WORKER_URL}?folder=${f}&name=${n}`);
@@ -71,8 +77,9 @@ const JSONProcessor = () => {
     setShowDialog(false);
   };
 
+
   const fetchScriptList = async () => {
-    const res = await fetch(`${WORKER_URL}list`); // debes implementar este endpoint en tu Worker
+    const res = await fetch(`${WORKER_URL}listScripts`);
     const json = await res.json();
     setScriptsList(json);
   };
@@ -85,14 +92,57 @@ const JSONProcessor = () => {
     const confirmDelete = window.confirm(`¿Eliminar el script "${n}" de la carpeta "${f}"?`);
     if (!confirmDelete) return;
 
-    await fetch(`${WORKER_URL}?folder=${f}&name=${n}`, {
+    await fetch(`${WORKER_URL}script?folder=${f}&name=${n}`, {
       method: "DELETE",
     });
     fetchScriptList();
   };
 
+  const saveJson = async () => {
+    if (!folderJson || !nameJson) return alert("Indique carpeta y nombre del JSON");
+    try {
+      JSON.parse(jsonInput);
+      await fetch(`${WORKER_URL}json?folder=${folderJson}&name=${nameJson}`, {
+        method: "POST",
+        body: jsonInput,
+      });
+      await fetchJsonList();
+      toast.success("JSON guardado con éxito");
+      setFolderJson("");
+      setNameJson("");
+    } catch (err: any) {
+      toast.error("JSON no válido: " + err.message);
+    }
+  };
+
+  const loadJson = async (f: string, n: string) => {
+    const res = await fetch(`${WORKER_URL}json?folder=${f}&name=${n}`);
+    const json = await res.text();
+    setJsonInput(json);
+    setShowDialog(false);
+  };
+
+
+  const deleteJson = async (f: string, n: string) => {
+    const confirmDelete = window.confirm(`¿Eliminar el JSON "${n}" de la carpeta "${f}"?`);
+    if (!confirmDelete) return;
+
+    await fetch(`${WORKER_URL}json?folder=${f}&name=${n}`, {
+      method: "DELETE",
+    });
+    await fetchJsonList();
+  };
+
+  const fetchJsonList = async () => {
+    const res = await fetch(`${WORKER_URL}listJson`);
+    const json = await res.json();
+    setJsonList(json);
+  };
+
+
   useEffect(() => {
     fetchScriptList();
+    fetchJsonList();
     const onFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
@@ -100,146 +150,264 @@ const JSONProcessor = () => {
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
+
   return (
     <div style={{ width: "100%", height: "100vh", padding: "2rem", boxSizing: "border-box", fontFamily: "Segoe UI, sans-serif", backgroundColor: "#121212", color: "#f5f5f5", display: "flex", flexDirection: "column" }}>
-      <Typography variant="h5" align="center" gutterBottom>🛠 JSON Processor App</Typography>
+      <Typography variant="h6" align="center" gutterBottom>🛠 JSON Processor App</Typography>
 
-      <Box
-        display="flex"
-        gap={2}
-        mb={2}
-        justifyContent="flex-end"
-        alignItems="center"
-      >
-        <Box sx={{ width: 240 }}>
-          <Autocomplete
-            freeSolo
-            options={Object.keys(scriptsList)}
-            value={folder}
-            onInputChange={(_, newValue) => setFolder(newValue)}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Carpeta"
-                size="small"
-                sx={{
-                  "& label": { color: "#f5f5f5" },
-                  "& .MuiInputBase-root": {
-                    color: "#ffffff",
-                    backgroundColor: "#1e1e1e",
-                    border: "1px solid #555",
-                  },
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    border: "none",
-                  },
-                }}
-              />
-            )}
+      <Box display="flex" gap={4} mb={2} justifyContent={"space-between"} mt={3}>
+        {/* Columna izquierda - JSON Manager */}
+        <Box flex={1} display="flex" gap={2} alignItems="center">
+          {/* Carpeta con sugerencias */}
+          <Box sx={{ width: 240 }}>
+            <Autocomplete
+              freeSolo
+              options={Object.keys(jsonList)} // <-- aquí pones las carpetas existentes
+              value={folderJson}
+              onInputChange={(_, newValue) => setFolderJson(newValue)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Carpeta"
+                  size="small"
+                  sx={{
+                    "& label": { color: "#f5f5f5" },
+                    "& .MuiInputBase-root": {
+                      color: "#ffffff",
+                      backgroundColor: "#1e1e1e",
+                      border: "1px solid #555",
+                    },
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      border: "none",
+                    },
+                  }}
+                />
+              )}
+            />
+          </Box>
+
+          {/* Nombre del JSON */}
+          <TextField
+            label="Nombre del JSON"
+            value={nameJson}
+            onChange={(e) => setNameJson(e.target.value)}
+            size="small"
+            InputLabelProps={{ style: { color: "#f5f5f5" } }}
+            InputProps={{
+              style: {
+                color: "#ffffff",
+                backgroundColor: "#1e1e1e",
+                border: "1px solid #555",
+              },
+            }}
           />
-        </Box>
-        <TextField
-          label="Nombre del script"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          size="small"
-          InputLabelProps={{ style: { color: "#f5f5f5" } }}
-          InputProps={{
-            style: {
-              color: "#ffffff",
-              backgroundColor: "#1e1e1e",
-              border: "1px solid #555",
-            },
-          }}
-        />
-        <Button onClick={saveScript} variant="outlined" color="info">
-          Guardar
-        </Button>
-        <Button
-          onClick={() => {
-            setShowDialog(true);
-            fetchScriptList();
-          }}
-          variant="outlined"
-          color="warning"
-        >
-          Load Script
-        </Button>
-      </Box>
 
+          <Button onClick={saveJson} variant="outlined" color="success">
+            Guardar JSON
+          </Button>
+        </Box>
+
+
+        {/* Columna derecha - Scripts */}
+        <Box flex={1} display="flex" gap={2} alignItems="center" justifyContent={"flex-end"}>
+          <Box sx={{ width: 240 }}>
+            <Autocomplete
+              freeSolo
+              options={Object.keys(scriptsList)}
+              value={folderScript}
+              onInputChange={(_, newValue) => setFolderScript(newValue)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Carpeta"
+                  size="small"
+                  sx={{
+                    "& label": { color: "#f5f5f5" },
+                    "& .MuiInputBase-root": {
+                      color: "#ffffff",
+                      backgroundColor: "#1e1e1e",
+                      border: "1px solid #555",
+                    },
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      border: "none",
+                    },
+                  }}
+                />
+              )}
+            />
+          </Box>
+          <TextField
+            label="Nombre del script"
+            value={nameScript}
+            onChange={(e) => setNameScript(e.target.value)}
+            size="small"
+            InputLabelProps={{ style: { color: "#f5f5f5" } }}
+            InputProps={{
+              style: {
+                color: "#ffffff",
+                backgroundColor: "#1e1e1e",
+                border: "1px solid #555",
+              },
+            }}
+          />
+          <Button onClick={saveScript} variant="outlined" color="info">
+            Guardar
+          </Button>
+          <Button
+            onClick={() => {
+              setShowDialog(true);
+              fetchScriptList();
+            }}
+            variant="outlined"
+            color="warning"
+          >
+            Load Script
+          </Button>
+        </Box>
+      </Box>
 
       <Dialog
         open={showDialog}
         onClose={() => setShowDialog(false)}
         fullWidth
-        maxWidth="sm"
+        maxWidth="lg"
         slotProps={{
           paper: {
             style: {
               backgroundColor: "#1e1e1e",
               color: "#f5f5f5",
+              height: "600px", // ← Alto fijo aquí
+              overflow: "auto", // ← Para que el contenido pueda hacer scroll si se desborda
             },
           },
         }}
       >
-        <DialogTitle style={{ backgroundColor: "#121212", color: "#00bcd4", padding: "16px" }}>
-          📂 Scripts Guardados
+        <DialogTitle style={{ backgroundColor: "#121212", color: "#00bcd4", padding: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography variant="h6">Gestor de archivos</Typography>
+          <Button
+            onClick={() => {
+              fetchScriptList();
+              fetchJsonList();
+              toast.info("Listas recargadas");
+            }}
+            variant="outlined"
+            color="info"
+            sx={{ marginRight: 2 }}
+          >
+            Recargar listas
+          </Button>
         </DialogTitle>
+
         <DialogContent
           dividers
-          style={{ backgroundColor: "#1e1e1e", paddingTop: "8px", paddingBottom: "8px" }}
+          style={{ backgroundColor: "#1e1e1e", paddingTop: "8px", paddingBottom: "8px", display: "flex", flexDirection: "row", gap: "3rem" }}
         >
-          {Object.entries(scriptsList).map(([f, scripts]) => (
-            <Box key={f} style={{ marginTop: "16px" }}>
-              <Button
-                fullWidth
-                onClick={() => toggleFolder(f)}
-                endIcon={expandedFolders[f] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                style={{
-                  justifyContent: "space-between",
-                  color: "#00bcd4",
-                  textTransform: "none",
-                  backgroundColor: "#2a2a2a",
-                  borderRadius: "4px",
-                  padding: "8px",
-                  marginBottom: "4px",
-                }}
-              >
-                {f}
-              </Button>
-              <Collapse in={expandedFolders[f]}>
-                <Box style={{ paddingLeft: "16px" }}>
-                  {scripts.map((s) => (
-                    <Box
-                      key={s}
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
-                    >
-                      <Button
-                        onClick={() => loadScript(f, s)}
-                        style={{
-                          textTransform: "none",
-                          color: "#80deea",
-                          justifyContent: "flex-start",
-                          width: "100%",
-                          paddingLeft: "12px",
-                        }}
+          <Box flex={1} display="flex" flexDirection="column" justifyContent={"flex-start"}>
+            {/* Sección JSONs */}
+            <Typography variant="h6" gutterBottom sx={{ color: "#4caf50", mt: 1 }}>
+              🧾 JSON Guardados
+            </Typography>
+            {Object.entries(jsonList).map(([f, jsonFiles]) => (
+              <Box key={f} sx={{ mt: 2 }}>
+                <Button
+                  fullWidth
+                  onClick={() => toggleFolder(f)}
+                  endIcon={expandedFolders[f] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  sx={{
+                    justifyContent: "space-between",
+                    color: "#4caf50",
+                    textTransform: "none",
+                    backgroundColor: "#2a2a2a",
+                    borderRadius: "4px",
+                    padding: "8px",
+                    mb: 1,
+                  }}
+                >
+                  {f}
+                </Button>
+                <Collapse in={expandedFolders[f]}>
+                  <Box sx={{ pl: 2 }}>
+                    {jsonFiles.map((s) => (
+                      <Box
+                        key={s}
+                        sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
                       >
-                        {s}
-                      </Button>
-                      <IconButton
-                        onClick={() => deleteScript(f, s)}
-                        style={{ color: "#f44336" }}
+                        <Button
+                          onClick={() => loadJson(f, s)}
+                          sx={{
+                            textTransform: "none",
+                            color: "#a5d6a7",
+                            justifyContent: "flex-start",
+                            width: "100%",
+                            pl: 1.5,
+                          }}
+                        >
+                          {s}
+                        </Button>
+                        <IconButton onClick={() => deleteJson(f, s)} sx={{ color: "#e57373" }}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                </Collapse>
+              </Box>
+            ))}
+          </Box>
+          <Box flex={1} display="flex" flexDirection="column">
+            {/* Sección Scripts */}
+            <Typography variant="h6" gutterBottom sx={{ color: "#00bcd4", mt: 1 }}>
+              📂 Scripts Guardados
+            </Typography>
+            {Object.entries(scriptsList).map(([f, scripts]) => (
+              <Box key={f} sx={{ mt: 2 }}>
+                <Button
+                  fullWidth
+                  onClick={() => toggleFolder(f)}
+                  endIcon={expandedFolders[f] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  sx={{
+                    justifyContent: "space-between",
+                    color: "#00bcd4",
+                    textTransform: "none",
+                    backgroundColor: "#2a2a2a",
+                    borderRadius: "4px",
+                    padding: "8px",
+                    mb: 1,
+                  }}
+                >
+                  {f}
+                </Button>
+                <Collapse in={expandedFolders[f]}>
+                  <Box sx={{ pl: 2 }}>
+                    {scripts.map((s) => (
+                      <Box
+                        key={s}
+                        sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
                       >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  ))}
-                </Box>
-              </Collapse>
-            </Box>
-          ))}
+                        <Button
+                          onClick={() => loadScript(f, s)}
+                          sx={{
+                            textTransform: "none",
+                            color: "#80deea",
+                            justifyContent: "flex-start",
+                            width: "100%",
+                            pl: 1.5,
+                          }}
+                        >
+                          {s}
+                        </Button>
+                        <IconButton onClick={() => deleteScript(f, s)} sx={{ color: "#f44336" }}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                </Collapse>
+              </Box>
+            ))}
+          </Box>
         </DialogContent>
       </Dialog>
-
 
       <div style={{ display: "flex", gap: "1rem", flex: 1, overflow: "hidden" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
